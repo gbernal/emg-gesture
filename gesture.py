@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.lib.recfunctions import append_fields
 import sys
+
 '''
 Represents a single gesture as given by signals
 '''
@@ -21,12 +22,21 @@ class Gesture:
 
     self._training_data = {}
     self._interlaced_training_data = {}
-    # The amount of time the training data should be normalized to (in seconds)
+    # The amount of time the training data should be normalized to (in ms)
     self.gesture_time = 100.0 
 
+  '''
+  Returns whether this Gesture model has been given training data
+  '''
   def has_been_trained(self):
     return len(self._training_data) > 0
 
+  '''
+  Train the gesture recognition model with specific training data. There is a preprocessing
+  stage where the data is manipulated to be stored as training data in a good form. The data
+  is stored, and then there is an additional post processing stage where the data is augmented to
+  provide additional information for future matching algorithms
+  '''
   def train(self, data, time_field=None, sensor_fields=None):
     if time_field is None: time_field = self._time_field
     if sensor_fields is None: sensor_fields = self._sensor_fields
@@ -51,6 +61,14 @@ class Gesture:
     return self._training_data
 
 
+  '''
+  A step to normalize the time domain to range from 0 to self._gesture_time.
+
+  Currently the length of the gesture is arbitrarily set. In the future, it might be beneficial to
+  set the time length of the gesture to the average length of the training data, though probably not
+  since all incoming data will be also stretched to conform around the average length of the 
+  training data
+  '''
   def _normalize_time_domain(self, data, time_field):
     data[time_field] = data[time_field] - data[time_field][0]
     low = 0.0
@@ -61,6 +79,9 @@ class Gesture:
         data[time_field])) / rng)
     return data
 
+  '''
+  The preprocessing state for data that is added to the gesture for training
+  '''
   def _preprocess(self, data, time_field, sensor_field):
     # center data at 0 and amplify data based on largest wave form
     data = self._normalize_time_domain(data, time_field)
@@ -74,13 +95,13 @@ class Gesture:
 
     data[sensor_field] = self._movingaverage(data[sensor_field], 10)
     '''
-      Filters not currently working on this data
-      blp, alp = signal.butter(4, 10/40, 'low', analog=True) # add 10Hz LP
-      bhp, ahp = signal.butter(4, .0, 'high', analog=True) # add 80Hz HP
-      bn, an = signal.butter(6, [(58/40)/(FS/2), (62/40)/(FS/2)], 'bandstop', analog=True) # add 80Hz HP
-      data[sensor] = signal.lfilter(bhp, ahp, data[sensor])
-      data[sensor] = signal.lfilter(bn, an, data[sensor])
-      data[sensor] = signal.lfilter(blp, alp, data[sensor])
+    Filters not currently working on this data
+    blp, alp = signal.butter(4, 10/40, 'low', analog=True) # add 10Hz LP
+    bhp, ahp = signal.butter(4, .0, 'high', analog=True) # add 80Hz HP
+    bn, an = signal.butter(6, [(58/40)/(FS/2), (62/40)/(FS/2)], 'bandstop', analog=True) # add 80Hz HP
+    data[sensor] = signal.lfilter(bhp, ahp, data[sensor])
+    data[sensor] = signal.lfilter(bn, an, data[sensor])
+    data[sensor] = signal.lfilter(blp, alp, data[sensor])
     '''
     data = self._cleanse(data, time_field, sensor_field)
     data = self._add_range_field_to_training_data(data, sensor_field)
@@ -98,20 +119,28 @@ class Gesture:
         dtype=data[sensor_field].dtype))
     return data
 
+  '''
+  Adds actual range information to the training data by looking at the interlaced data for
+  each of the sensors
+  '''
   def _add_range_to_training_data(self, sensor_field): 
     all_samples = self._interlaced_training_data[sensor_field]
     delta = .1
     ranges = {}
     for sample in all_samples:
-      ranges[sample[self._time_field]] = max(all_samples[(sample[self._time_field] + delta >
-          all_samples[self._time_field]) & (sample[self._time_field] - delta <
-              all_samples[self._time_field])][sensor_field])
+      ranges[sample[self._time_field]] = max(all_samples[(sample[
+          self._time_field] + delta > all_samples[self._time_field]) & 
+          (sample[self._time_field] - delta < all_samples[self._time_field])][sensor_field])
     for data in self._training_data[sensor_field]:
       for i in data:
         if i[self._time_field] in ranges:
           i[self._range_field] = ranges[i[self._time_field]]
     return self._training_data
 
+ 
+  '''
+  Provides a moving average function to smooth out signals
+  '''
   def _movingaverage(self, data, window_len=10):
     if data.ndim != 1:
       raise ValueError, "movingaverage only accepts 1 dimension arrays."
@@ -124,6 +153,7 @@ class Gesture:
     y = np.convolve(w / w.sum(), s, mode='same')
     return y[window_len-1:-window_len+1]
 
+  ''' GETTERS '''
   def get_time_field(self):
     return self._time_field
 

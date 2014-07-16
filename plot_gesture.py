@@ -13,6 +13,8 @@ def plot_gesture(gesture):
       data_range = trial[gesture.get_range_field()]
       y1 = trial[sensor] - data_range
       y2 = trial[sensor] + data_range
+      # shows a rough approximation of the gesture profile heat map. In this code, it is more
+      # continuous, whilst this implementation shows discrete levels.
       ax.fill_between(trial[gesture.get_time_field()], y1, y2, where=y2>=y1,
           facecolor=(1, 0, 0, 1./len(data)), label=ax, interpolate=True, linewidth=0)
     interlaced_data = gesture.get_interlaced_data()
