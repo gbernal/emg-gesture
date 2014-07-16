@@ -1,9 +1,4 @@
-import matplotlib as mpl
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.cbook as cbook
-from scipy import signal
-from convert import *
 from gesture import *
 from plot_gesture import *
 
