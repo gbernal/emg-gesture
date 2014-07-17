@@ -33,6 +33,7 @@ def create_gestures():
   return gestures
 
 def center_data(data):
+  data[time_field] = data[time_field] - data[time_field][0]
   for ax in axis:
     floating_center = 464 
     # TODO: do this on the fly
@@ -42,7 +43,7 @@ def center_data(data):
     data[ax] = np.abs(data[ax])
   return data
 
-def create_gesture_from_filename(fname, data):
+def get_training_data_windows(fname):
   # Load the video annotation file
   annotation = np.genfromtxt('annotation/' + fname + '.csv', delimiter=',', skip_header=1,
       names=['start', 'end'])
@@ -53,10 +54,13 @@ def create_gesture_from_filename(fname, data):
   start = map(lambda x: (x - offset - windowError) * 1000 / fps, annotation['start'])
   end = map(lambda x: (x - offset  + windowError) * 1000 / fps, annotation['end'])
   windows = zip(start, end)
+  return windows
+
+def create_gesture_from_filename(fname, data):
+  windows = get_training_data_windows(fname)
   window_size = windows[0][1] - windows[0][0]
   gesture = Gesture(fname)
   # set data so that it starts at 0
-  data[time_field] = data[time_field] - data[time_field][0]
   for window in windows:
     filtered_trial_data = {}
     for sensor,shift in sensors_and_shift:
@@ -70,10 +74,37 @@ def plot_gestures(gestures):
     plot_gesture(gesture)
 
 def detect_gestures(gestures):
+  import time
   detector = GestureDetector(gestures)
   for fname in files:
     data = np.genfromtxt('data/' + fname + '.CSV', delimiter=',', skip_header=1, 
         names=[time_field] + axis)
     data = center_data(data)
+    t0 = time.clock()
     detector.find_gestures(data)
+    print 'took', time.clock() - t0, 's'
  
+def test_training_gestures(gestures):
+  detector = GestureDetector(gestures)
+  windows = []
+  for ann_fname in gesture_annotation_files:
+    windows += get_training_data_windows(ann_fname)
+  for fname in files:
+    data = np.genfromtxt('data/' + fname + '.CSV', delimiter=',', skip_header=1, 
+        names=[time_field] + axis)
+    data = center_data(data)
+    for start, end in windows:
+      found_gesture = False
+      best_score = 0
+      best_gesture = None
+      for gesture in gestures:
+        is_gesture, score = detector.is_gesture(data, start, gesture)
+        if score > best_score:
+          if is_gesture:
+            print 'found gesture', gesture, 'in training data at time', start, 'with score', score
+            found_gesture = is_gesture
+          else:
+            best_score = score
+            best_gesture = gesture
+      if not found_gesture:
+        print 'did not find a gesture at time', start, '. But got a best score of', best_score, 'for', best_gesture

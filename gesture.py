@@ -76,7 +76,6 @@ class Gesture:
   training data
   '''
   def _normalize_time_domain(self, data, time_field):
-    data[time_field] = data[time_field] - data[time_field][0]
     low = 0.0
     mins = min(data[time_field])
     maxs = max(data[time_field])
@@ -117,6 +116,7 @@ class Gesture:
     # set the standards for an ideal gesture by using a percentage of the score of the average of
     # the training data
     self._interlaced_data_scores[sensor_field] = self._compare_sensor(self._interlaced_training_data[sensor_field], sensor_field)
+    print self._interlaced_data_scores
 
   def _cleanse(self, data, time_field, sensor_field):
     return data[[time_field, sensor_field]]
@@ -189,15 +189,16 @@ class Gesture:
         training_range = training_sample[self._range_field]
         high = training_sample[sensor_field] + training_range
         low = training_sample[sensor_field] - training_range
-        if signal_sample[sensor_field] > low and signal_sample[sensor_field] < high:
-          dist += (1 - ((high + low) / 2 - signal_sample[sensor_field] ))
+        if signal_sample[sensor_field] >= low and signal_sample[sensor_field] <= high:
+          dist += training_range - abs(training_sample[sensor_field] - signal_sample[sensor_field])
+
         i += 1
         # While the next index of the signal is closer to the next index of the data its being 
         # compared to, increment that index of the signal
-        while i < len(trial) and j + 1 < len(signal) and abs(signal[j + 1][self._time_field] - trial[i][self._time_field]) > abs(signal[j][self._time_field] - trial[i][self._time_field]):
+        while i < len(trial) and j + 1 < len(signal) and abs(signal[j + 1][self._time_field] - trial[i][self._time_field]) <= abs(signal[j][self._time_field] - trial[i][self._time_field]):
           j += 1
     return dist
-
+  
   ''' GETTERS '''
   def get_time_field(self):
     return self._time_field
@@ -212,7 +213,8 @@ class Gesture:
     return self._gesture_time
 
   def get_max_gesture_time_length(self):
-    return self._max_training_gesture_time * 1.2
+    # TODO: increase this multiplier, probably
+    return self._max_training_gesture_time * 1
 
   def get_data(self):
     return self._training_data
