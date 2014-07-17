@@ -24,11 +24,23 @@ def create_gestures():
   for fname in files:
     data = np.genfromtxt('data/' + fname + '.CSV', delimiter=',', skip_header=1, 
         names=[time_field] + axis)
+    data = center_data(data)
 
   gestures = []
   for fname in gesture_annotation_files:
-    gestures.append(create_gesture_from_filename(fname, data))
+    gesture = create_gesture_from_filename(fname, data)
+    gestures.append(gesture)
   return gestures
+
+def center_data(data):
+  for ax in axis:
+    floating_center = 464 
+    # TODO: do this on the fly
+    # determined by taking average of all samples
+    avg = np.average(data[ax])
+    data[ax] -= floating_center
+    data[ax] = np.abs(data[ax])
+  return data
 
 def create_gesture_from_filename(fname, data):
   # Load the video annotation file
@@ -62,5 +74,6 @@ def detect_gestures(gestures):
   for fname in files:
     data = np.genfromtxt('data/' + fname + '.CSV', delimiter=',', skip_header=1, 
         names=[time_field] + axis)
+    data = center_data(data)
     detector.find_gestures(data)
  
